@@ -1,24 +1,35 @@
-# Forma | Quality assurance record
+# FORMA | Quality assurance record
 
-Verification date: November 15, 2026. Public build: [GitHub Pages](https://nurzhigittt.github.io/forma-habits/). Tests and documentation were expanded without changing the production application source.
+Verification date: November 15, 2026.
 
-| Area | Observed result |
+**Latest successful full CI run:** [Verify FORMA #2](https://github.com/Nurzhigittt/forma-habits/actions/runs/43728705886), commit `333570739aca14e571bef9b11ce91c898ffafa30`.
+
+| Area | Verified result |
 | --- | --- |
-| xUnit unit | **21 passed**, no failures. Tests exercise pure domain rules. |
-| xUnit integration | **11 passed**, no failures. Real `HabitStore`, versioned JSON and `BrowserStorage` are tested together; only `IJSRuntime` is replaced by a controlled test double. |
-| Managed code coverage | **Forma.Core: 93.84% lines (183/195), 80.76% branches (168/208).** **HabitStore + BrowserStorage: 100% lines (97/97), 70.96% branches (44/62).** These are two scoped Coverlet runs, not overall app coverage. |
-| Manual desktop Chromium | Passed: quantity up to goal, reload, History/Insights, JSON backup export, malformed backup rejection, valid backup restore, edit, cancel deletion, then confirm deletion. Tested with synthetic records in an isolated preview. The public site was also verified to open without login and persist a synthetic checked habit after refresh. |
-| Manual narrow Chromium viewport | Checked at **390×844** and **393×851** CSS px: no horizontal overflow, editor receives focus, create and mark a temporary habit, then open History. This is a viewport check, not a physical-device test. |
-| Playwright E2E | **17 cases discovered**, not verified as passing. Five scenarios configured on each of Chromium, Firefox and WebKit, plus one on each mobile profile. The available automated runner could not start a browser. |
-| Native Safari, physical iOS/Android, manual Firefox | **Not verified.** Run the checklist in the [Testing guide](../tests/README.md) before claiming device or native-browser coverage. |
+| xUnit unit | **21 passed**, zero failures/skips. Pure domain schedules, immutable updates, validation, progress and metrics. |
+| xUnit integration | **11 passed**, zero failures/skips. Real HabitStore, versioned JSON and BrowserStorage with the controlled IJSRuntime test double. These passed through the normal full solution test command on GitHub Actions. |
+| Release build | **Passed**: Blazor WebAssembly release publication completed successfully. |
+| Browser end-to-end | **17 passed**, zero failures, on GitHub Actions against the live GitHub Pages website. |
+| Browser engine matrix | Five scenarios each in desktop Chromium, Firefox and WebKit; one mobile workflow each in Android and iOS emulation. |
+| Workflow scenarios | Numeric progress and reload; History/Insights; JSON export/restore and invalid backup rejection; edit/delete and cancellation; storage write failure; narrow layout, editor focus, creating/completing a habit and opening History. |
+| Coverage | Scoped Coverlet runs completed. Forma.Core line coverage **93.84%**; HabitStore + BrowserStorage scoped line coverage **100%**. These are not whole-application coverage figures. See CI artifacts for current XML. |
+| Native Safari / physical devices | **Not verified.** WebKit is an engine test; mobile profiles are emulation, not real iPhones or Android phones. |
 
-Raw scoped Cobertura reports, with only source paths made relative: [Core](evidence/core-only.xml), [persistence boundary](evidence/store-only.xml).
+## Reproduce and inspect evidence
 
-Known limitations: browser-local persistence does not sync across devices. Simultaneous edits in multiple tabs are not synchronized; use a single tab when editing.
+- [Testing guide](../tests/README.md)
+- [Current CI workflow](../../.github/workflows/verify.yml)
+- [Run logs and downloadable artifacts](https://github.com/Nurzhigittt/forma-habits/actions/runs/43728705886): `domain-and-coverage` and `browser-report`.
+- Prior scoped Cobertura evidence: [Core](evidence/core-only.xml) and [persistence boundary](evidence/store-only.xml).
+- Earlier in-process xUnit rerun XML: [unit](evidence/verified-unit.xml) and [integration](evidence/verified-integration.xml). The integration XML used the documented isolated harness because the local runtime could not launch the WebAssembly task host. The full GitHub CI result above supersedes that environment limitation.
 
+The browser suite uses isolated contexts and synthetic habits, and does not edit a user's existing records. Production application code and the published deployment archive were unchanged by this source/test documentation publication.
 
-## Fresh rerun — 2026-11-15
-**21 unit cases passed; 11 integration cases passed; zero failures or skips.** Raw xUnit XML is included as [unit evidence](evidence/verified-unit.xml) and [integration evidence](evidence/verified-integration.xml).
-SDK 10.0.404, .NET runtime 10.0.15. Unit tests were built normally and run with the xUnit v3 in-process runner. The integration tests ran unchanged in a temporary test project linking the actual HabitStore and BrowserStorage source plus Forma.Core; only the existing IJSRuntime test double was used. This isolates persistence integration from the WebAssembly asset build task, which cannot launch its task host in this environment. The harness project is under verification/isolated-integration; it is an alternative verification route, not a replacement production application.
-The normal full-solution build and normal CI workflow still require a standard environment. No full browser build or overall coverage rerun is claimed here.
-A new Playwright Chromium/Android-emulated attempt stopped before application assertions because browser startup required a Unix socket disallowed by this runtime. This was an environment error, not a verified application test failure. Native Safari/Firefox/physical phones remain unverified.
+## Scope and limitations
+
+Data remains local to the site origin and browser profile. There is no account or automatic synchronization. Simultaneous edits in different tabs are not synchronized; use one tab when editing.
+No physical-device test, native macOS Safari test, large-scale load test or overall application coverage percentage is claimed.
+
+## Manual observations before CI
+
+Desktop Chromium had also been checked for logging, reload, review screens, edit/delete, invalid backup rejection and restore. Narrow viewport checks used 390×844 and 393×851 CSS pixels. These historical observations are separate from the automated engine matrix above.
