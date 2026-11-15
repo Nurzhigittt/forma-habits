@@ -1,0 +1,120 @@
+<SurfaceDialog @ref="_dialog" Label="HABIT STUDIO" Title="@(Existing is null ? "Make a new beginning." : "Refine your rhythm.")" OnClose="OnClose">
+    <form class="habit-form" @onsubmit="Save" @onsubmit:preventDefault>
+        <div class="field">
+            <label for="habit-name">Habit name</label>
+            <input id="habit-name" data-testid="habit-name" maxlength="80" placeholder="e.g. Read before bed" @bind="_name" @bind:event="oninput" required autofocus />
+        </div>
+        <div class="field-pair">
+            <fieldset>
+                <legend>Make it recognizable</legend>
+                <div class="picker">
+                    @foreach (var icon in HabitPresentation.Icons)
+                    {
+                        <button type="button" title="@icon.Label" aria-label="@icon.Label" aria-pressed="@(_icon == icon.Name ? "true" : "false")"
+                                class="@(_icon == icon.Name ? "choice selected" : "choice")" @onclick="() => _icon = icon.Name"><HabitIcon Name="@icon.Name" /></button>
+                    }
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>A touch of color</legend>
+                <div class="picker">
+                    @foreach (var color in HabitPresentation.Colors)
+                    {
+                        <button type="button" title="@color" aria-label="@color" aria-pressed="@(_color == color ? "true" : "false")"
+                                class="@($"choice swatch {HabitPresentation.IconClass(color)} {(_color == color ? "selected" : "")}")"
+                                @onclick="() => _color = color"><span></span></button>
+                    }
+                </div>
+            </fieldset>
+        </div>
+        <div class="field">
+            <label for="habit-kind">How would you like to track it?</label>
+            <select id="habit-kind" data-testid="habit-kind" @bind="_kind">
+                <option value="Check">Simply done or not done</option>
+                <option value="Quantity">A number toward a goal</option>
+            </select>
+        </div>
+        @if (_kind == HabitKind.Quantity)
+        {
+            <div class="field-pair">
+                <div class="field"><label for="habit-target">Target</label><input id="habit-target" data-testid="habit-target" type="number" min="1" max="1000000" step="1" @bind="_target" @bind:event="oninput" required /></div>
+                <div class="field"><label for="habit-unit">Unit</label><input id="habit-unit" data-testid="habit-unit" maxlength="24" placeholder="pages, minutes…" @bind="_unit" @bind:event="oninput" /></div>
+            </div>
+        }
+        <fieldset>
+            <legend>On which days?</legend>
+            <div class="picker weekday-picker">
+                @foreach (var day in HabitPresentation.Days)
+                {
+                    <button type="button" aria-label="@day.Long" aria-pressed="@(_days.HasFlag(day.Flag) ? "true" : "false")"
+                        class="@(_days.HasFlag(day.Flag) ? "choice selected" : "choice")" @onclick="() => _days ^= day.Flag">@day.Short</button>
+                }
+            </div>
+            <p class="help">Rest days don’t break streaks.</p>
+        </fieldset>
+        <div class="field">
+            <label for="habit-start">Start date</label>
+            <input id="habit-start" data-testid="habit-start" type="date" max="@Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" @bind="_start" />
+        </div>
+        @if (RemovesLogs)
+        {
+            <label class="warning-check"><input type="checkbox" @bind="_allowRemoval" /> I understand that changing the tracking type or schedule may remove past check-ins.</label>
+        }
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <p class="alert" role="alert">@Error</p>
+        }
+        <div class="dialog-actions">
+            <button type="button" class="btn ghost" @onclick="Cancel">Cancel</button>
+            <button type="submit" class="btn primary" data-testid="save-habit" disabled="@(_pending || (RemovesLogs && !_allowRemoval))">@(Existing is null ? "Create habit" : "Save changes") <span aria-hidden="true">›</span></button>
+        </div>
+    </form>
+</SurfaceDialog>
+
+@code {
+    [Parameter] public Habit? Existing { get; set; }
+    [Parameter] public Habit? Seed { get; set; }
+    [Parameter] public DateOnly Today { get; set; }
+    [Parameter] public bool HasLogs { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback<Habit> OnSave { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private SurfaceDialog? _dialog;
+    private string _name = "", _unit = "", _icon = "leaf", _color = "sage";
+    private HabitKind _kind;
+    private int _target = 1;
+    private Weekdays _days = Weekdays.All;
+    private DateOnly _start;
+    private bool _pending, _allowRemoval;
+    private bool RemovesLogs => HasLogs && Existing is not null &&
+        (Existing.Kind != _kind || (Existing.Days & _days) != Existing.Days || Existing.StartDate < _start);
+
+    protected override void OnInitialized()
+    {
+        var draft = Existing ?? Seed;
+        _name = draft?.Name ?? "";
+        _unit = draft?.Unit ?? "";
+        _icon = draft?.Icon ?? "leaf";
+        _color = draft?.Color ?? "sage";
+        _kind = draft?.Kind ?? HabitKind.Check;
+        _target = draft?.Target ?? 1;
+        _days = draft?.Days ?? Weekdays.All;
+        _start = draft?.StartDate ?? Today;
+    }
+
+    private async Task Save()
+    {
+        if (_pending || (RemovesLogs && !_allowRemoval)) return;
+        _pending = true;
+        try
+        {
+            var habit = new Habit(Existing?.Id ?? Guid.NewGuid(), _name.Trim(), _kind,
+                _kind == HabitKind.Check ? 1 : _target, _kind == HabitKind.Check ? "" : _unit.Trim(), _days, _start, _icon, _color);
+            await OnSave.InvokeAsync(habit);
+        }
+        finally { _pending = false; }
+    }
+
+    private Task Cancel() => _dialog?.CloseAsync() ?? Task.CompletedTask;
+}

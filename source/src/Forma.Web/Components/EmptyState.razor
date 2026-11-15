@@ -1,0 +1,15 @@
+<div class="empty-state">
+    <span class="empty-symbol" aria-hidden="true">+</span>
+    <h3>@Title</h3>
+    <p>@Message</p>
+    @if (ChildContent is not null)
+    {
+        <div class="empty-actions">@ChildContent</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Message { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

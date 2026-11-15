@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup>
+<TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+</PropertyGroup>
+<ItemGroup>
+<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+<PackageReference Include="xunit.v3" Version="3.2.2" />
+<PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
+<FrameworkReference Include="Microsoft.AspNetCore.App" />
+<ProjectReference Include="../../source/src/Forma.Core/Forma.Core.csproj" />
+<Compile Include="../../source/src/Forma.Web/State/HabitStore.cs" Link="Production/HabitStore.cs" />
+<Compile Include="../../source/src/Forma.Web/State/BrowserStorage.cs" Link="Production/BrowserStorage.cs" />
+<Compile Include="../../source/tests/Forma.Integration.Tests/HabitStoreTests.cs" Link="Tests/HabitStoreTests.cs" />
+<Compile Include="../../source/tests/Forma.Integration.Tests/BrowserRuntimeStub.cs" Link="Tests/BrowserRuntimeStub.cs" />
+</ItemGroup>
+</Project>

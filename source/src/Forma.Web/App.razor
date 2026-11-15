@@ -1,0 +1,491 @@
+@implements IDisposable
+@inject HabitStore Store
+@inject NavigationManager Navigation
+
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+    <div class="header-inner">
+        <a class="brand" href="#today" @onclick="() => SelectPage(Page.Today)"><Mark /> <span>Forma<span class="brand-dot">.</span></span></a>
+        <nav class="main-nav" aria-label="Main navigation">
+            @foreach (var entry in Pages)
+            {
+                <a href="@($"#{entry.Key}")" data-testid="@($"nav-{entry.Key}")" aria-current="@(_page == entry.Page ? "page" : null)"
+                   @onclick="() => SelectPage(entry.Page)">@entry.Label</a>
+            }
+        </nav>
+        <button type="button" class="btn header-button" @onclick="() => OpenEditor()"
+                disabled="@(!Store.Ready)">New habit <span aria-hidden="true">›</span></button>
+    </div>
+</header>
+
+<main id="main" tabindex="-1">
+@if (!Store.Ready)
+{
+    <section class="splash"><p class="eyebrow"><span class="index">FORMA</span> / LOADING</p><h1>Getting things ready.</h1></section>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(Store.Error) && !DialogOpen && _page != Page.Settings && !_editing)
+    {
+        <p class="alert global-alert content-width" role="alert">@Store.Error</p>
+    }
+    @if (_page == Page.Today)
+    {
+        <section class="hero">
+            <div class="hero-inner content-width">
+                <div class="date-chip"><span></span>@Store.Today.ToString("dddd, MMMM d", CultureInfo.InvariantCulture)</div>
+                <h1>A better everyday.<br />Built by you<span>.</span></h1>
+                <p>Small actions. Real progress. A space to build<br class="desktop-break" /> the routines that move you forward.</p>
+                <button type="button" class="btn primary hero-button" data-testid="new-habit" @onclick="() => OpenEditor()">New habit <span aria-hidden="true">›</span></button>
+                <dl class="metrics hero-metrics">
+                    <Metric Value="@($"{View.Today.Completed}/{View.Today.Scheduled}")" Label="Habits completed today" />
+                    <Metric Value="@View.BestCurrent.ToString()" Unit="days" Label="Strongest active streak" />
+                    <Metric Value="@($"{View.Week.Percent}%")" Label="Of this week’s habits done" />
+                </dl>
+            </div>
+        </section>
+        <div class="today-grid content-width">
+            <section class="practice">
+                <SectionHeader Index="01" Label="YOUR DAILY PRACTICE" Title="Make today count.">
+                    <Action><a href="#history" class="text-link" @onclick="() => SelectPage(Page.History)">View history <span aria-hidden="true">›</span></a></Action>
+                </SectionHeader>
+                <DayStrip Week="@Tracker.WeekStart(Store.Today)" Today="@Store.Today" Selected="@_selected" Select="PickDay" State="@Store.State" />
+                @DayHabits
+            </section>
+            <aside class="momentum">
+                <SectionHeader Index="02" Label="YOUR MOMENTUM" Title="This week, in focus." />
+                <p class="side-metric">@View.Week.Percent% <span class="subtle">of scheduled habits done</span></p>
+                <WeekChart Label="Weekly completion" Values="@View.WeekChart" />
+                <p class="count-caption">@View.Week.Completed of @View.Week.Scheduled completed · through today</p>
+                <div class="coach-tile">
+                    <CoachArt />
+                    <p class="eyebrow"><span class="index">✦</span> THE FORMA COACH</p>
+                    <h3>@View.CoachTitle</h3>
+                    <p>@View.CoachMessage</p>
+                    <a href="#insights" class="text-link" @onclick="() => SelectPage(Page.Insights)">Explore insights <span aria-hidden="true">›</span></a>
+                </div>
+            </aside>
+        </div>
+    }
+    else if (_page == Page.History)
+    {
+        <section class="page-panel content-width">
+            <header class="page-heading">
+                <p class="eyebrow"><span class="index">01</span> / YOUR CHECK-INS</p>
+                <h1>Look how far you’ve come.</h1>
+                <p>Revisit each day, fill in missed check-ins, and see your progress over time.</p>
+            </header>
+            <div class="panel">
+                <div class="history-toolbar">
+                    <div class="history-nav">
+                        <button type="button" class="icon-button" aria-label="Previous week" disabled="@(HistoryWeek.DayNumber < 7)" @onclick="() => ShiftWeek(-7)">‹</button>
+                        <p>@HistoryWeek.ToString("MMM d", CultureInfo.InvariantCulture) <span aria-hidden="true">→</span> @HistoryWeek.AddDays(6).ToString("MMM d, yyyy", CultureInfo.InvariantCulture)</p>
+                        <button type="button" class="icon-button" aria-label="Next week" disabled="@(HistoryWeek >= Tracker.WeekStart(Store.Today))" @onclick="() => ShiftWeek(7)">›</button>
+                    </div>
+                    <div class="field history-date"><label for="history-date">Jump to date</label><input id="history-date" type="date" max="@Iso(Store.Today)" value="@Iso(_selected)" @onchange="ChangeDate" /></div>
+                </div>
+                <DayStrip Week="@HistoryWeek" Today="@Store.Today" Selected="@_selected" Select="PickDay" State="@Store.State" />
+                @DayHabits
+            </div>
+        </section>
+    }
+    else if (_page == Page.Insights)
+    {
+        <section class="page-panel content-width">
+            <header class="page-heading">
+                <p class="eyebrow"><span class="index">02</span> / PATTERNS &amp; PROGRESS</p>
+                <h1>A clearer picture.</h1>
+                <p>Find your rhythm using the last 28 days of scheduled check-ins.</p>
+            </header>
+            <dl class="metrics insight-metrics">
+                <Metric Value="@($"{View.Month.Percent}%")" Label="28-day completion" />
+                <Metric Value="@View.Month.Completed.ToString()" Label="Completed check-ins" />
+                <Metric Value="@View.BestEver.ToString()" Unit="days" Label="Longest streak" />
+            </dl>
+            <div class="insight-grid">
+                <section class="panel">
+                    <SectionHeader Index="01" Label="WEEKDAY PATTERN" Title="When you show up." Description="Completion by day of the week, not by number of habits." />
+                    <WeekChart Label="Last 28 days completion by weekday" Values="@View.WeekdayPattern" />
+                    <p class="subtle count-caption">@View.Month.Completed of @View.Month.Scheduled scheduled check-ins completed over the last 28 days.</p>
+                </section>
+                <section class="coach-tile insight-coach">
+                    <CoachArt />
+                    <p class="eyebrow"><span class="index">✦</span> THE FORMA COACH</p>
+                    <h2>@View.CoachTitle</h2>
+                    <p>@View.CoachMessage</p>
+                    <details><summary>How is this calculated?</summary><p>Forma compares completion on weekdays with at least three scheduled check-ins. It suggests the least consistent weekday only if completion there was below 70%. These rules run on your device.</p></details>
+                </section>
+            </div>
+            <section class="panel streak-panel">
+                <SectionHeader Index="02" Label="KEEP SHOWING UP" Title="Your streaks." Description="Only days on the habit’s schedule count. A rest day never breaks a streak." />
+                @if (Store.State.Habits.Length == 0)
+                {
+                    <p class="subtle">Your streaks will appear here after you create a habit.</p>
+                }
+                else
+                {
+                    <div class="streak-list" role="list" aria-label="Habit streaks">
+                    @foreach (var habit in Store.State.Habits)
+                    {
+                        var streak = View.Streaks[habit.Id];
+                        <div class="@($"streak-row {HabitPresentation.IconClass(habit.Color)}")" role="listitem" @key="habit.Id">
+                            <span class="habit-badge"><HabitIcon Name="@habit.Icon" /></span><strong>@habit.Name</strong>
+                            <span>@streak.Current current · @streak.Best best</span>
+                        </div>
+                    }
+                    </div>
+                }
+            </section>
+        </section>
+    }
+    else if (_page == Page.Habits)
+    {
+        <section class="page-panel content-width">
+            <header class="page-heading">
+                <p class="eyebrow"><span class="index">03</span> / YOUR ROUTINE</p>
+                <h1>Make it yours.</h1>
+                <p>Adjust the habits and schedules that shape your everyday.</p>
+                <button type="button" class="btn primary" @onclick="() => OpenEditor()">New habit <span aria-hidden="true">›</span></button>
+            </header>
+            <section class="panel">
+                <SectionHeader Index="01" Label="HABIT LIBRARY" Title="My habits." />
+                @if (Store.State.Habits.Length == 0)
+                {
+                    <EmptyState Title="A clean slate." Message="Create a habit to start building a routine that fits.">
+                        <button type="button" class="btn secondary" @onclick="() => OpenEditor()">Add a habit</button>
+                    </EmptyState>
+                }
+                else
+                {
+                    <div class="habit-list" role="list" aria-label="My habits">
+                        @foreach (var habit in Store.State.Habits)
+                        {
+                            <HabitCard @key="habit.Id" Habit="@habit" ManagementMode="true"
+                                       OnEdit="() => OpenEditor(habit)" OnDelete="() => AskDelete(habit)" />
+                        }
+                    </div>
+                }
+            </section>
+        </section>
+    }
+    else
+    {
+        <section class="page-panel content-width">
+            <header class="page-heading">
+                <p class="eyebrow"><span class="index">04</span> / SETTINGS &amp; DATA</p>
+                <h1>Your data. Your device.</h1>
+                <p>No account. No tracking. Your routine stays in this browser.</p>
+            </header>
+            <div class="settings-grid">
+                <section class="panel">
+                    <SectionHeader Index="01" Label="KEEP A COPY" Title="Export a backup."
+                      Description="Download a JSON file containing your habits and check-ins. Store it somewhere safe to use on another device." />
+                    <button type="button" class="btn secondary" data-testid="export-backup" @onclick="() => Export(false)">Download backup <span aria-hidden="true">↓</span></button>
+                    @if (Store.HasUnreadableBackup)
+                    {
+                        <button type="button" class="btn secondary" @onclick="() => Export(true)">Download recovery copy <span aria-hidden="true">↓</span></button>
+                    }
+                </section>
+                <section class="panel">
+                    <SectionHeader Index="02" Label="BRING IT BACK" Title="Restore a backup."
+                        Description="Choose a Forma JSON file (up to 2 MB). You can review its habit count before replacing the data on this browser." />
+                    <label class="field backup-field" for="import-backup">
+                        <span>Choose a backup file</span>
+                        <InputFile id="import-backup" data-testid="import-backup" accept=".json,application/json" OnChange="ReadBackup" @key="_fileKey" />
+                    </label>
+                </section>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_importError) || (!DialogOpen && !string.IsNullOrWhiteSpace(Store.Error)))
+            {
+                <p class="alert" role="alert">@(_importError ?? Store.Error)</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(_notice))
+            {
+                <p class="notice" role="status">@_notice</p>
+            }
+            <p class="subtle settings-note">Private browsing, clearing site data, or using another browser may mean your data isn’t available. Keep a backup of anything you want to save.</p>
+        </section>
+    }
+}
+</main>
+
+<footer class="site-footer">
+    <div class="content-width footer-inner">
+        <a class="brand" href="#today" @onclick="() => SelectPage(Page.Today)"><Mark /> <span>Forma<span class="brand-dot">.</span></span></a>
+        <span>A little more intentional. Every day.</span>
+        <a class="text-link" href="#settings" @onclick="() => SelectPage(Page.Settings)">Your data, on your device <span aria-hidden="true">›</span></a>
+    </div>
+</footer>
+
+@if (_editing)
+{
+    <HabitEditor Today="@Store.Today" Existing="@_existing" Seed="@_seed" Error="@_editorError"
+                 HasLogs="@(_existing is not null && Store.State.Logs.ContainsKey(_existing.Id))" OnSave="SaveHabit" OnClose="CloseEditor" />
+}
+@if (_delete is not null)
+{
+    <SurfaceDialog Label="CONFIRM DELETE" Title="Delete this habit?" OnClose="CloseDelete">
+        <p>“@_delete.Name” and its check-ins will be removed from this browser. This cannot be undone inside Forma.</p>
+        @DialogError
+        <div class="dialog-actions">
+            <button type="button" class="btn ghost" @onclick="CloseDelete">Cancel</button>
+            <button type="button" class="btn danger" data-testid="confirm-delete" disabled="@_working" @onclick="DoDelete">Delete habit</button>
+        </div>
+    </SurfaceDialog>
+}
+@if (_incoming is not null)
+{
+    <SurfaceDialog Label="CONFIRM RESTORE" Title="Restore this backup?" OnClose="CloseImport">
+        <p>This file contains @_incoming.Habits.Length habit(s) and @_incoming.Logs.Values.Sum(x => x.Count) check-ins. Restoring it replaces all existing habits and check-ins in this browser.</p>
+        @DialogError
+        <div class="dialog-actions">
+            <button type="button" class="btn ghost" @onclick="CloseImport">Cancel</button>
+            <button type="button" class="btn primary" data-testid="confirm-import" disabled="@_working" @onclick="DoImport">Replace and restore</button>
+        </div>
+    </SurfaceDialog>
+}
+@if (_progressHabit is not null)
+{
+    <SurfaceDialog Label="DAILY CHECK-IN" Title="Set your progress." OnClose="CloseProgress">
+        <form @onsubmit="SaveProgress" @onsubmit:preventDefault>
+            <div class="field">
+                <label for="set-amount">@_progressHabit.Name (@_progressHabit.Unit)</label>
+                <input id="set-amount" type="number" min="0" max="1000000" step="1" autofocus @bind="_progressValue" @bind:event="oninput" required />
+            </div>
+            @DialogError
+            <div class="dialog-actions">
+                <button type="button" class="btn ghost" @onclick="CloseProgress">Cancel</button>
+                <button type="submit" class="btn primary" disabled="@_working">Save progress</button>
+            </div>
+        </form>
+    </SurfaceDialog>
+}
+
+@code {
+    private enum Page { Today, History, Insights, Habits, Settings }
+    private static readonly (Page Page, string Key, string Label)[] Pages =
+    [
+        (Page.Today, "today", "Today"), (Page.History, "history", "History"),
+        (Page.Insights, "insights", "Insights"), (Page.Habits, "habits", "My habits"), (Page.Settings, "settings", "Settings")
+    ];
+
+    private Page _page;
+    private DateOnly _selected;
+    private DateOnly HistoryWeek => Tracker.WeekStart(_selected);
+    private bool _editing, _working;
+    private Habit? _existing, _seed, _delete, _progressHabit;
+    private int _progressValue, _fileKey;
+    private string? _editorError, _importError, _notice;
+    private TrackerState? _incoming;
+    private TrackerState? _lastSnapshot;
+    private ProgressView? _cachedView;
+    private bool DialogOpen => _editing || _delete is not null || _progressHabit is not null || _incoming is not null;
+
+    private ProgressView View
+    {
+        get
+        {
+            if (!ReferenceEquals(_lastSnapshot, Store.State) || _cachedView is null)
+            {
+                _lastSnapshot = Store.State;
+                _cachedView = ProgressView.Create(Store.State, Store.Today);
+            }
+            return _cachedView;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _selected = Store.Today;
+        Navigation.LocationChanged += LocationChanged;
+        ReadPage(Navigation.Uri);
+        await Store.InitializeAsync();
+        _selected = Store.Today;
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= LocationChanged;
+
+    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _ = InvokeAsync(() => { ReadPage(e.Location); StateHasChanged(); });
+    }
+
+    private void ReadPage(string location)
+    {
+        var fragment = new Uri(location).Fragment.TrimStart('#');
+        foreach (var item in Pages)
+            if (item.Key == fragment) { SelectPage(item.Page); return; }
+        if (fragment.Length == 0) SelectPage(Page.Today);
+    }
+
+    private void SelectPage(Page page)
+    {
+        if (_page == page) return;
+        _page = page;
+        if (page == Page.Today || page == Page.History) _selected = Store.Today;
+        if (page == Page.Settings) _notice = null;
+    }
+
+    private void PickDay(DateOnly date)
+    {
+        if (date <= Store.Today) _selected = date;
+    }
+
+    private void ShiftWeek(int delta)
+    {
+        if (HistoryWeek.DayNumber + delta < 0 ||
+            HistoryWeek.DayNumber + delta > Tracker.WeekStart(Store.Today).DayNumber) return;
+        var next = _selected.AddDays(delta);
+        _selected = next > Store.Today ? Store.Today : next;
+    }
+
+    private static string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private void ChangeDate(ChangeEventArgs args)
+    {
+        if (DateOnly.TryParseExact(args.Value?.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            PickDay(day);
+    }
+
+    private RenderFragment DayHabits => @<div class="daily-list">
+        @{
+            var counts = Tracker.Summarize(Store.State, _selected, _selected);
+            var currentDate = _selected;
+        }
+        <div class="daily-summary">
+            <span>@counts.Scheduled scheduled @((counts.Scheduled == 1) ? "habit" : "habits")</span>
+            <span aria-live="polite">@counts.Completed / @counts.Scheduled complete</span>
+        </div>
+        @if (Store.State.Habits.Length == 0)
+        {
+            <EmptyState Title="Your first step starts here." Message="Choose a starting point. You can make it your own.">
+                <button type="button" class="btn secondary compact" @onclick="OpenWaterSeed">Drink water</button>
+                <button type="button" class="btn secondary compact" @onclick="OpenReadingSeed">Read a little</button>
+                <button type="button" class="btn secondary compact" @onclick="OpenWalkSeed">Take a walk</button>
+            </EmptyState>
+        }
+        else if (counts.Scheduled == 0)
+        {
+            <EmptyState Title="Room to breathe." Message="There’s nothing scheduled for this day. Rest days don’t break your streak." />
+        }
+        else
+        {
+            <div class="habit-list" role="list" aria-label="Scheduled habits">
+                @foreach (var habit in Store.State.Habits.Where(h => Tracker.IsScheduled(h, currentDate)))
+                {
+                    <HabitCard @key="habit.Id" Habit="@habit" Value="@Tracker.GetProgress(Store.State, habit.Id, currentDate)"
+                         Complete="@Tracker.IsComplete(Store.State, habit, currentDate)"
+                         OnToggle="() => Store.ToggleProgressAsync(habit.Id, currentDate)"
+                         OnAdjust="amount => Store.AdjustProgressAsync(habit.Id, currentDate, amount)"
+                         OnSet="() => OpenProgress(habit)" />
+                }
+            </div>
+        }
+    </div>;
+
+    private RenderFragment DialogError => @<div>
+        @if (!string.IsNullOrWhiteSpace(Store.Error))
+        {
+            <p class="alert" role="alert">@Store.Error</p>
+        }
+    </div>;
+
+    private void OpenEditor(Habit? habit = null)
+    {
+        _editorError = null;
+        _seed = null;
+        _existing = habit;
+        _editing = true;
+    }
+
+    private void OpenSeed(string name, string icon, string color, int? target = null, string unit = "")
+    {
+        OpenEditor();
+        _seed = new Habit(Guid.Empty, name, target is null ? HabitKind.Check : HabitKind.Quantity,
+            target ?? 1, unit, Weekdays.All, Store.Today, icon, color);
+    }
+
+    private void OpenWaterSeed() => OpenSeed("Drink water", "water", "blue", 6, "glasses");
+    private void OpenReadingSeed() => OpenSeed("Read a little", "book", "peach", 10, "pages");
+    private void OpenWalkSeed() => OpenSeed("Take a walk", "walk", "sage");
+
+    private void CloseEditor() { _editing = false; _editorError = null; }
+
+    private async Task SaveHabit(Habit draft)
+    {
+        if (await Store.SaveHabitAsync(draft)) CloseEditor();
+        else _editorError = Store.Error;
+    }
+
+    private void AskDelete(Habit habit) => _delete = habit;
+    private void CloseDelete() => _delete = null;
+
+    private async Task DoDelete()
+    {
+        if (_delete is null || _working) return;
+        _working = true;
+        try { if (await Store.DeleteHabitAsync(_delete.Id)) CloseDelete(); }
+        finally { _working = false; }
+    }
+
+    private void OpenProgress(Habit habit)
+    {
+        _progressHabit = habit;
+        _progressValue = Tracker.GetProgress(Store.State, habit.Id, _selected);
+    }
+
+    private void CloseProgress() => _progressHabit = null;
+
+    private async Task SaveProgress()
+    {
+        if (_progressHabit is null || _working) return;
+        _working = true;
+        try { if (await Store.SetProgressAsync(_progressHabit.Id, _selected, _progressValue)) CloseProgress(); }
+        finally { _working = false; }
+    }
+
+    private async Task Export(bool recovery)
+    {
+        _notice = null;
+        _importError = null;
+        if (await Store.ExportAsync(recovery)) _notice = "Backup download requested.";
+    }
+
+    private async Task ReadBackup(InputFileChangeEventArgs args)
+    {
+        _notice = null;
+        _importError = null;
+        _incoming = null;
+        if (args.FileCount != 1) { _importError = "Choose one backup file."; _fileKey++; return; }
+        var file = args.File;
+        if (file.Size > HabitStore.MaxBackupBytes) { _importError = "The backup is larger than 2 MB."; _fileKey++; return; }
+        try
+        {
+            using var reader = new StreamReader(file.OpenReadStream(HabitStore.MaxBackupBytes));
+            var result = Store.ParseBackup(await reader.ReadToEndAsync());
+            if (result.IsSuccess) _incoming = result.Value;
+            else _importError = result.Error;
+        }
+        catch (Exception error) when (error is IOException or JSException or InvalidOperationException)
+        {
+            _importError = "The browser couldn’t read this backup. Try choosing the file again.";
+        }
+        finally { _fileKey++; }
+    }
+
+    private void CloseImport() => _incoming = null;
+
+    private async Task DoImport()
+    {
+        if (_incoming is null || _working) return;
+        _working = true;
+        try
+        {
+            if (await Store.ReplaceFromBackupAsync(_incoming))
+            {
+                _notice = "Backup restored.";
+                CloseImport();
+            }
+        }
+        finally { _working = false; }
+    }
+}

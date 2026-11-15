@@ -1,0 +1,26 @@
+<div class="day-strip" role="group" aria-label="Choose a day">
+    @for (var i = 0; i < 7; i++)
+    {
+        var day = Week.AddDays(i);
+        var summary = Tracker.Summarize(State, day, day);
+        <button type="button" class="@($"day-button {(day == Selected ? "selected" : "")}")"
+            disabled="@(day > Today)" aria-pressed="@(day == Selected ? "true" : "false")"
+            aria-label="@AccessibleLabel(day, summary)"
+            @onclick="() => Select.InvokeAsync(day)">
+            <small>@day.ToString("ddd", CultureInfo.InvariantCulture)</small>
+            <span>@day.Day</span>
+            <b class="day-dot @(summary.Scheduled > 0 && summary.Completed == summary.Scheduled ? "full" : "")" aria-hidden="true"></b>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public DateOnly Week { get; set; }
+    [Parameter] public DateOnly Today { get; set; }
+    [Parameter] public DateOnly Selected { get; set; }
+    [Parameter, EditorRequired] public TrackerState State { get; set; } = TrackerState.Empty;
+    [Parameter] public EventCallback<DateOnly> Select { get; set; }
+
+    private static string AccessibleLabel(DateOnly day, PeriodSummary summary) =>
+        day.ToString("dddd, MMMM d", CultureInfo.InvariantCulture) + $": {summary.Completed} of {summary.Scheduled} complete";
+}

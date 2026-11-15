@@ -1,0 +1,54 @@
+<article class="@($"habit-row {HabitPresentation.IconClass(Habit.Color)}")" role="listitem" aria-label="@Habit.Name">
+    <div class="habit-badge"><HabitIcon Name="@Habit.Icon" /></div>
+    <div class="habit-content">
+        <h3>@Habit.Name</h3>
+        @if (ManagementMode)
+        {
+            <p class="subtle">@HabitPresentation.Schedule(Habit.Days) <span aria-hidden="true">·</span> @(Habit.Kind == HabitKind.Quantity ? $"Goal: {Habit.Target} {Habit.Unit}" : "Check-off habit")</p>
+        }
+        else if (Habit.Kind == HabitKind.Quantity)
+        {
+            <p class="subtle"><span class="quantity-text">@Value / @Habit.Target @Habit.Unit</span> <span aria-hidden="true">·</span> @(Complete ? "Complete" : "In progress")</p>
+            <progress class="habit-progress" aria-label="@($"{Habit.Name} progress")" value="@Math.Min(Value, Habit.Target)" max="@Habit.Target"></progress>
+        }
+        else
+        {
+            <p class="subtle">@(Complete ? "Complete" : "Not done")</p>
+        }
+    </div>
+    @if (ManagementMode)
+    {
+        <div class="habit-controls">
+            <button type="button" class="btn secondary compact" data-testid="edit-habit" aria-label="@($"Edit {Habit.Name}")" @onclick="OnEdit">Edit</button>
+            <button type="button" class="icon-button" data-testid="delete-habit" aria-label="@($"Delete {Habit.Name}")" @onclick="OnDelete">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3m4 0-1 15H6L5 6m5 4v7m4-7v7"/></svg>
+            </button>
+        </div>
+    }
+    else if (Habit.Kind == HabitKind.Quantity)
+    {
+        <div class="habit-controls">
+            <button type="button" class="icon-button" data-testid="decrement-progress" aria-label="@($"Decrease {Habit.Name} progress")" disabled="@(Value == 0)" @onclick="() => OnAdjust.InvokeAsync(-1)">−</button>
+            <button type="button" class="icon-button increment" data-testid="increment-progress" aria-label="@($"Increase {Habit.Name} progress")" disabled="@(Value >= 1_000_000)" @onclick="() => OnAdjust.InvokeAsync(1)">+</button>
+            <button type="button" class="btn secondary compact goal-button" data-testid="set-progress" aria-label="@($"Set {Habit.Name} progress")" @onclick="OnSet">Set</button>
+        </div>
+    }
+    else
+    {
+        <button type="button" class="btn secondary compact check-button" data-testid="toggle-complete" aria-label="@($"Complete {Habit.Name}")" aria-pressed="@(Complete ? "true" : "false")" @onclick="OnToggle">
+            <span aria-hidden="true">@(Complete ? "✓" : "○")</span> @(Complete ? "Done" : "Mark done")
+        </button>
+    }
+</article>
+
+@code {
+    [Parameter, EditorRequired] public Habit Habit { get; set; } = default!;
+    [Parameter] public int Value { get; set; }
+    [Parameter] public bool Complete { get; set; }
+    [Parameter] public bool ManagementMode { get; set; }
+    [Parameter] public EventCallback OnToggle { get; set; }
+    [Parameter] public EventCallback<int> OnAdjust { get; set; }
+    [Parameter] public EventCallback OnSet { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
+}

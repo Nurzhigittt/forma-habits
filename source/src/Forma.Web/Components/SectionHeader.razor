@@ -1,0 +1,22 @@
+<header class="section-head">
+    <div class="section-heading">
+        <p class="eyebrow"><span class="index">@Index</span> / @Label</p>
+        <h2>@Title</h2>
+        @if (!string.IsNullOrWhiteSpace(Description))
+        {
+            <p class="subtle section-description">@Description</p>
+        }
+    </div>
+    @if (Action is not null)
+    {
+        <div class="section-action">@Action</div>
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Index { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public RenderFragment? Action { get; set; }
+}

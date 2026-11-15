@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+.DS_Store
+dist/
+tests/e2e/node_modules/
+playwright-report/
+test-results/
+TestResults/

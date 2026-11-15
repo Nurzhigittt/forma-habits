@@ -1,0 +1,29 @@
+@inject IJSRuntime Browser
+<dialog @ref="_dialog" class="surface-dialog" aria-label="@Title" @onclose="Closed">
+    <div class="dialog-inner">
+        <header class="dialog-head">
+            <div>
+                <p class="eyebrow"><span class="index">FORMA</span> / @Label</p>
+                <h2>@Title</h2>
+            </div>
+            <button type="button" class="icon-button" aria-label="Close" @onclick="CloseAsync">×</button>
+        </header>
+        @ChildContent
+    </div>
+</dialog>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    private ElementReference _dialog;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.InvokeVoidAsync("forma.showDialog", _dialog);
+    }
+
+    public async Task CloseAsync() => await Browser.InvokeVoidAsync("forma.closeDialog", _dialog);
+    private Task Closed() => OnClose.InvokeAsync();
+}

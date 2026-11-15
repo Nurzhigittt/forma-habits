@@ -1,0 +1,18 @@
+<div class="week-chart" role="list" aria-label="@Label">
+    @foreach (var item in Values)
+    {
+        var percent = Math.Clamp(item.Percent, 0, 100);
+        <div class="chart-day" role="listitem" aria-label="@($"{item.Label}: {item.Detail}")">
+            <span class="bar-track" aria-hidden="true" title="@($"{item.Label}: {item.Detail}")">
+                <span class="bar-fill" style="@($"--fill:{percent.ToString(CultureInfo.InvariantCulture)}%")"></span>
+            </span>
+            <span class="chart-label" aria-hidden="true">@item.Label</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ChartPoint> Values { get; set; } = [];
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    public sealed record ChartPoint(string Label, int Percent, string Detail);
+}
